@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -25,6 +26,9 @@ enum RokuKey {
   VolumeDown = 'VolumeDown',
   VolumeMute = 'VolumeMute',
   VolumeUp = 'VolumeUp',
+  InputHDMI1 = 'InputHDMI1',
+  InputHDMI2 = 'InputHDMI2',
+  InputHDMI3 = 'InputHDMI3',
 }
 
 interface AppConfig {
@@ -93,14 +97,16 @@ const parseNaturalLanguageCommand = async (prompt: string): Promise<SmartCommand
 
       Valid Roku Keys:
       Power, PowerOff, PowerOn, Home, Rev, Fwd, Play, Select, Left, Right, Down, Up, Back, 
-      InstantReplay, Info, Backspace, Search, Enter, VolumeDown, VolumeMute, VolumeUp.
+      InstantReplay, Info, Backspace, Search, Enter, VolumeDown, VolumeMute, VolumeUp,
+      InputHDMI1, InputHDMI2, InputHDMI3.
 
       If the user wants to open a specific app (like Netflix, YouTube), you cannot launch it directly by name in this mode, 
       so you should navigate to Home first. If the request is complex, break it down.
       
       Example: "Turn it up" -> ["VolumeUp", "VolumeUp", "VolumeUp"]
       Example: "Go home and mute" -> ["Home", "VolumeMute"]
-      Example: "Pause" -> ["Play"] (Play acts as toggle)
+      Example: "Switch to PlayStation" (assuming HDMI1) -> ["InputHDMI1"]
+      Example: "Turn on and watch TV" -> ["PowerOn", "InputHDMI1"]
     `;
 
     const response = await ai.models.generateContent({
@@ -145,7 +151,7 @@ interface RemoteButtonProps {
   label?: string;
   icon?: string;
   onClick: () => void;
-  variant?: 'default' | 'primary' | 'danger' | 'dpad';
+  variant?: 'default' | 'primary' | 'danger' | 'dpad' | 'success';
   className?: string;
   disabled?: boolean;
 }
@@ -163,7 +169,8 @@ const RemoteButton: React.FC<RemoteButtonProps> = ({
   const variants = {
     default: "bg-zinc-800 hover:bg-zinc-700 text-zinc-200 shadow-md rounded-2xl h-14 w-14",
     primary: "bg-roku-purple hover:bg-violet-600 text-white shadow-lg shadow-purple-900/30 rounded-full h-16 w-16",
-    danger: "bg-red-900/30 text-red-400 hover:bg-red-900/50 border border-red-900/50 rounded-full h-12 w-12",
+    danger: "bg-red-900/20 text-red-400 hover:bg-red-900/40 border border-red-900/30 rounded-full h-12 w-12",
+    success: "bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/30 rounded-full h-14 w-14",
     dpad: "bg-zinc-700 hover:bg-zinc-600 text-white"
   };
 
@@ -238,7 +245,7 @@ const Settings: React.FC<SettingsProps> = ({ config, onSave, isOpen, onClose }) 
           <div className="flex items-center justify-between p-3 bg-zinc-950/50 rounded-xl border border-zinc-800/50">
             <div>
               <p className="text-white font-medium">Keyboard Shortcuts</p>
-              <p className="text-xs text-zinc-500">Press keys to control TV (P, M, Arrows)</p>
+              <p className="text-xs text-zinc-500">P (On+HDMI1), Shift+P (Off), M (Mute)</p>
             </div>
             <button
               onClick={() => setLocalConfig({ ...localConfig, enableHotkeys: !localConfig.enableHotkeys })}
@@ -359,6 +366,28 @@ function App() {
     }
   }, [config]);
 
+  // Special macro for Power On + HDMI 1
+  const handlePowerOnSequence = async () => {
+    addLog('Macro', 'pending', 'Powering On + Switching to HDMI 1');
+    
+    try {
+      // 1. Send Power On
+      await handleCommand(RokuKey.PowerOn, 'Power On');
+      
+      // 2. Wait for TV to boot (4 seconds usually safe)
+      // If simulation, we speed it up
+      const delay = config.simulationMode ? 800 : 4000;
+      addLog('Wait', 'pending', `Waiting ${delay/1000}s for TV boot...`);
+      await new Promise(r => setTimeout(r, delay));
+      
+      // 3. Switch Input
+      await handleCommand(RokuKey.InputHDMI1, 'Source: HDMI 1');
+      addLog('Macro', 'success', 'TV Ready on HDMI 1');
+    } catch (e) {
+      addLog('Macro', 'error', 'Sequence interrupted');
+    }
+  };
+
   // AI Command Handler
   const handleSmartCommand = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,8 +423,12 @@ function App() {
 
       switch (e.key) {
         case 'p':
+          // Lowercase p = Smart On
+          handlePowerOnSequence();
+          break;
         case 'P':
-          handleCommand(RokuKey.Power, 'Shortcut: Power');
+          // Uppercase P (Shift+p) = Power Off
+          handleCommand(RokuKey.PowerOff, 'Power Off');
           break;
         case 'm':
         case 'M':
@@ -441,7 +474,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [config.enableHotkeys, handleCommand]);
+  }, [config.enableHotkeys, handleCommand, config.simulationMode]); // Added deps
 
   const needsSetup = !config.ipAddress || config.ipAddress === '192.168.1.X';
 
@@ -487,13 +520,25 @@ function App() {
             {/* Status Indicator */}
             <div className={`absolute top-6 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full transition-colors duration-300 ${isProcessingAI ? 'bg-roku-accent animate-ping' : 'bg-zinc-800'}`} />
 
-            <div className="flex justify-between items-center mb-10 px-2 mt-4">
-               <RemoteButton 
-                 icon="power_settings_new" 
-                 variant="danger" 
-                 onClick={() => handleCommand(RokuKey.Power)} 
-                 className="shadow-red-900/20"
-               />
+            <div className="flex justify-between items-center mb-10 px-2 mt-4 gap-2">
+               {/* Split Power Controls */}
+               <div className="flex gap-2">
+                 <RemoteButton 
+                   icon="power_off" 
+                   variant="danger" 
+                   onClick={() => handleCommand(RokuKey.PowerOff, 'Power Off')}
+                   className="w-12 h-14 rounded-2xl"
+                   label=""
+                 />
+                 <RemoteButton 
+                   icon="power_settings_new" 
+                   variant="success" 
+                   onClick={handlePowerOnSequence} 
+                   className="w-16 h-14 rounded-2xl"
+                   label="" 
+                 />
+               </div>
+               
                <RemoteButton 
                  icon="home" 
                  onClick={() => handleCommand(RokuKey.Home)} 
@@ -596,7 +641,7 @@ function App() {
               </button>
             </form>
             <p className="text-xs text-zinc-500 mt-3">
-              Powered by Gemini. Try complex sequences like "Turn volume up 3 times and pause".
+              Powered by Gemini. Try "Switch to HDMI 1" or "Wake up the TV".
             </p>
           </div>
 
@@ -635,10 +680,10 @@ function App() {
             <div className="flex-1">
               <strong className="text-zinc-400 block mb-1">Hotkeys (when enabled)</strong>
               <div className="grid grid-cols-2 gap-y-1">
-                <span><kbd className="bg-zinc-800 px-1 rounded text-zinc-300">P</kbd> Power</span>
-                <span><kbd className="bg-zinc-800 px-1 rounded text-zinc-300">M</kbd> Mute</span>
+                <span><kbd className="bg-zinc-800 px-1 rounded text-zinc-300">P</kbd> Smart On (HDMI1)</span>
+                <span><kbd className="bg-zinc-800 px-1 rounded text-zinc-300">Shift+P</kbd> Power Off</span>
                 <span><kbd className="bg-zinc-800 px-1 rounded text-zinc-300">Arrows</kbd> Navigate</span>
-                <span><kbd className="bg-zinc-800 px-1 rounded text-zinc-300">Enter</kbd> Select</span>
+                <span><kbd className="bg-zinc-800 px-1 rounded text-zinc-300">M</kbd> Mute</span>
               </div>
             </div>
           </div>
