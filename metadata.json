@@ -1,0 +1,5 @@
+{
+  "name": "Roku AI Commander",
+  "description": "A smart remote for Roku/Onn TVs with keyboard shortcuts and AI-powered natural language commands.",
+  "requestFramePermissions": []
+}
