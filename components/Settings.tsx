@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppConfig } from '../types';
+import { AppConfig } from '../types.ts';
 
 interface SettingsProps {
   config: AppConfig;

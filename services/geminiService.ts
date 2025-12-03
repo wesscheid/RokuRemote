@@ -1,9 +1,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { SmartCommandResponse } from "../types";
+import { SmartCommandResponse } from "../types.ts";
 
 // Initialize Gemini Client
-// Requires process.env.API_KEY to be set
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Requires process.env.API_KEY to be set. 
+// We add a check for process existence to prevent crashes in environments where it is undefined.
+const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : '';
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 export const parseNaturalLanguageCommand = async (prompt: string): Promise<SmartCommandResponse> => {
   try {

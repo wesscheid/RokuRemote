@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { RokuKey, AppConfig, CommandLog } from './types';
-import { sendRokuCommand } from './services/rokuService';
-import { parseNaturalLanguageCommand } from './services/geminiService';
-import { RemoteButton } from './components/RemoteButton';
-import { Settings } from './components/Settings';
+import { RokuKey, AppConfig, CommandLog } from './types.ts';
+import { sendRokuCommand } from './services/rokuService.ts';
+import { parseNaturalLanguageCommand } from './services/geminiService.ts';
+import { RemoteButton } from './components/RemoteButton.tsx';
+import { Settings } from './components/Settings.tsx';
 
 const DEFAULT_CONFIG: AppConfig = {
   ipAddress: '192.168.1.X',

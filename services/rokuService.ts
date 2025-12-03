@@ -1,4 +1,4 @@
-import { RokuKey } from '../types';
+import { RokuKey } from '../types.ts';
 
 export const sendRokuCommand = async (ip: string, key: string, isSimulation: boolean): Promise<void> => {
   if (isSimulation) {
