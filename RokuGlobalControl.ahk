@@ -71,6 +71,20 @@ RokuIP := "192.168.0.5"
     }
 }
 
+; HOTKEY: Alt + 4
+!4::
+{
+    ; Visual feedback in Windows Tray
+    TrayTip "Roku Remote", "Switching to Roku Cameras...", 1
+    
+    try {
+        ; Launch the Roku Cameras app (App ID: 660807)
+        SendRokuCommand("launch/660807")
+    } catch as e {
+        TrayTip "Roku Error", "Failed to connect to Roku at " . RokuIP, 3
+    }
+}
+
 ; Helper Function to send POST requests
 SendRokuCommand(endpoint) {
     url := "http://" . RokuIP . ":8060/" . endpoint

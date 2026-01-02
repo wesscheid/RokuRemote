@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RokuKey, AppConfig, CommandLog } from './types';
-import { sendRokuCommand, executePowerOnMacro } from './services/rokuService';
+import { sendRokuCommand, executePowerOnMacro, launchApp } from './services/rokuService';
 import { parseNaturalLanguageCommand } from './services/geminiService';
 import { RemoteButton } from './components/RemoteButton';
 import { Settings } from './components/Settings';
@@ -62,6 +62,22 @@ function App() {
       addLog(displayCommand, config.simulationMode ? 'simulated' : 'success');
     } catch (error) {
       addLog(displayCommand, 'error', 'Network/Proxy Error');
+    }
+  }, [config]);
+
+  const handleLaunchApp = useCallback(async (appId: string, name: string) => {
+    if (!config.simulationMode && (config.ipAddress === '192.168.1.X' || !config.ipAddress)) {
+      addLog(`Launch ${name}`, 'error', 'Missing IP Address');
+      setIsSettingsOpen(true);
+      return;
+    }
+
+    try {
+      addLog(name, 'pending', 'Launching...');
+      await launchApp(config.ipAddress, appId, config.simulationMode);
+      addLog(name, config.simulationMode ? 'simulated' : 'success');
+    } catch (error) {
+      addLog(name, 'error', 'Launch Failed');
     }
   }, [config]);
 
@@ -264,6 +280,16 @@ function App() {
                 <RemoteButton icon="volume_off" onClick={() => handleCommand(RokuKey.VolumeMute)} className="h-12 w-12" />
                 <RemoteButton icon="remove" onClick={() => handleCommand(RokuKey.VolumeDown)} className="h-12 w-12" />
               </div>
+            </div>
+
+            {/* App Shortcuts */}
+            <div className="mt-8 flex justify-center gap-4">
+                <RemoteButton 
+                    label="Cameras" 
+                    icon="videocam"
+                    onClick={() => handleLaunchApp('660807', 'Roku Cameras')}
+                    className="w-auto px-6 rounded-xl bg-zinc-800 hover:bg-roku-purple text-zinc-300"
+                />
             </div>
             
             <button 

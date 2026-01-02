@@ -76,3 +76,33 @@ export const executePowerOnMacro = async (ip: string, isSimulation: boolean): Pr
         throw error;
     }
 };
+
+export const launchApp = async (ip: string, appId: string, isSimulation: boolean): Promise<void> => {
+  if (isSimulation) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        console.log(`[SIMULATION] Launching App ${appId} on ${ip}`);
+        resolve();
+      }, 300);
+    });
+  }
+
+  // WebView2 Bridge Mode
+  if (isWebView()) {
+    (window as any).chrome.webview.postMessage({
+      type: 'launch',
+      ip,
+      appId
+    });
+    return Promise.resolve();
+  }
+
+  // Chrome App Mode / Direct
+  try {
+    const rokuUrl = `http://${ip}:8060/launch/${appId}`;
+    await fetch(rokuUrl, { method: 'POST' });
+  } catch (error) {
+    console.error(`Failed to launch app ${appId}:`, error);
+    throw error;
+  }
+};
